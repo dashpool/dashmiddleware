@@ -1,0 +1,13 @@
+displayName: Dashpool Middleware
+type: middleware
+iconPath: .assets/icon.png
+
+import: github.com/dashpool/dashmiddleware
+
+summary: 'Middleware to integrate dash apps into Dashpool'
+
+testData:
+  mongohost: mongo:2701
+  
+    
+
