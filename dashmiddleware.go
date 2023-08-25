@@ -1,4 +1,4 @@
-// Package dashmiddleware integrates dash apps into Dashpool
+// Package dashmiddleware a plugin integrate Dash apps into Dashpool via a Middleware.
 package dashmiddleware
 
 import (
@@ -8,32 +8,32 @@ import (
 
 // Config the plugin configuration.
 type Config struct {
-	Mongohost string
+	mongohost string ``
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
-	return &Config{}
+	return &Config{
+		mongohost: "",
+	}
 }
 
-// DashMiddleware a Dash Middleware plugin.
+// DashMiddleware a DashMiddleware plugin.
 type DashMiddleware struct {
-	next        http.Handler
-	name        string
-	mongohost   string
+	next      http.Handler
+	mongohost string
+	name      string
 }
 
 // New created a new DashMiddleware plugin.
-func New(ctx context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
+func New(_ context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	return &DashMiddleware{
-		next:        next,
-		name:        name,
-		mongohost:   config.Mongohost,
+		mongohost: config.mongohost,
+		next:      next,
+		name:      name,
 	}, nil
 }
 
 func (c *DashMiddleware) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	c.next.ServeHTTP(rw, req)
 }
-
-

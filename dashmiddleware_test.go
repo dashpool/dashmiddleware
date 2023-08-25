@@ -11,7 +11,7 @@ import (
 
 func TestDemo(t *testing.T) {
 	cfg := dashmiddleware.CreateConfig()
-	cfg.Mongohost = "mongo:2701"
+	cfg.mongohost = "mongo:2701"
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {})
@@ -31,4 +31,3 @@ func TestDemo(t *testing.T) {
 	handler.ServeHTTP(recorder, req)
 
 }
-
