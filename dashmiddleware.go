@@ -8,6 +8,7 @@ import (
 
 // Config the plugin configuration.
 type Config struct {
+	Mongohost string
 }
 
 // CreateConfig creates the default plugin configuration.
@@ -19,6 +20,7 @@ func CreateConfig() *Config {
 type DashMiddleware struct {
 	next        http.Handler
 	name        string
+	mongohost   string
 }
 
 // New created a new DashMiddleware plugin.
@@ -26,6 +28,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	return &DashMiddleware{
 		next:        next,
 		name:        name,
+		mongohost:   config.Mongohost
 	}, nil
 }
 
