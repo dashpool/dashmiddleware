@@ -28,7 +28,7 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 	return &DashMiddleware{
 		next:        next,
 		name:        name,
-		mongohost:   config.Mongohost
+		mongohost:   config.Mongohost,
 	}, nil
 }
 
