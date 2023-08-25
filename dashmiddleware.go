@@ -15,7 +15,7 @@ func CreateConfig() *Config {
 	return &Config{}
 }
 
-// Dash Middleware.
+// DashMiddleware a Dash Middleware plugin.
 type DashMiddleware struct {
 	next        http.Handler
 	name        string
