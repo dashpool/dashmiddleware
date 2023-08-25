@@ -6,15 +6,18 @@ import (
 	"net/http"
 )
 
+// I hope ajdklfalsdjlfkjalksdjflkajsldkjflkajsd lkjfalöksdjflköjasd ölkjfadsf
+// ak dfjkasjdölkfjöaldsjlöfkjaösdf.
+
 // Config the plugin configuration.
 type Config struct {
-	mongohost string ``
+	Mongohost string // Corrected field name and data type
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
 	return &Config{
-		mongohost: "",
+		Mongohost: "", // Corrected field name
 	}
 }
 
@@ -25,10 +28,10 @@ type DashMiddleware struct {
 	name      string
 }
 
-// New created a new DashMiddleware plugin.
+// New creates a new DashMiddleware plugin.
 func New(_ context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	return &DashMiddleware{
-		mongohost: config.mongohost,
+		mongohost: config.Mongohost, // Corrected field name
 		next:      next,
 		name:      name,
 	}, nil
