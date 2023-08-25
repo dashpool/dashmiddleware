@@ -3,9 +3,7 @@ package dashmiddleware
 
 import (
 	"context"
-	"fmt"
 	"net/http"
-	"strings"
 )
 
 // Config the plugin configuration.
