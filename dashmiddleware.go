@@ -2,43 +2,37 @@
 package dashmiddleware
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"net/http"
-
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // Config the plugin configuration.
 type Config struct {
-	Mongohost  string
-	Dashpooldb string
+	TrackURL string
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
 	return &Config{
-		Mongohost:  "",
-		Dashpooldb: "",
+		TrackURL: "http://backand.dashpool-system:8080/track",
 	}
 }
 
 // DashMiddleware a DashMiddleware plugin.
 type DashMiddleware struct {
-	next       http.Handler
-	mongohost  string
-	dashpooldb string
-	name       string
+	next     http.Handler
+	trackURL string
+	name     string
 }
 
 // New creates a new DashMiddleware plugin.
 func New(_ context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	return &DashMiddleware{
-		mongohost:  config.Mongohost,
-		dashpooldb: config.Dashpooldb,
-		next:       next,
-		name:       name,
+		trackURL: config.TrackURL,
+		next:     next,
+		name:     name,
 	}, nil
 }
 
@@ -46,35 +40,43 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	// Use the context from the incoming request
 	ctx := req.Context()
 
-	ctx, cancel := context.WithTimeout(ctx, 10)
+	_, cancel := context.WithTimeout(ctx, 10)
 	defer cancel()
-
-	// Create a MongoDB client
-	clientOptions := options.Client().ApplyURI(c.mongohost)
-	client, err := mongo.Connect(ctx, clientOptions)
-	if err != nil {
-		http.Error(responseWriter, "Mongo Connection not possible", http.StatusInternalServerError)
-		return
-	}
-	defer func() {
-		if disconnectErr := client.Disconnect(ctx); disconnectErr != nil {
-			http.Error(responseWriter, "Mongo Disconnected", http.StatusInternalServerError)
-		}
-	}()
-
-	// Select the MongoDB database using the provided dashpooldb
-	db := client.Database(c.dashpooldb)
-
-	// Insert the request data into a MongoDB collection
-	// Here, we'll create a 'requests' collection and insert the request URL
-	collection := db.Collection("requests")
-	_, err = collection.InsertOne(ctx, bson.M{"url": req.URL.String()})
-	if err != nil {
-		// Handle the error (e.g., log it)
-		http.Error(responseWriter, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
 
 	// Continue the request down the middleware chain
 	c.next.ServeHTTP(responseWriter, req)
+
+	// Define the JSON payload to send in the request body
+	payload := map[string]interface{}{
+		"Request": "SomeRequestValue",
+		"Result":  "SomeResultValue",
+		"URL":     req.URL.String(),
+		"User":    "SomeUserValue",
+	}
+
+	// Marshal the payload into a JSON string
+	payloadJSON, err := json.Marshal(payload)
+	if err != nil {
+		http.Error(responseWriter, "Failed to create JSON payload", http.StatusInternalServerError)
+		return
+	}
+
+	// Make a request to the external REST API to track the request
+	resp, err := http.Post(c.trackURL, "application/json", bytes.NewBuffer(payloadJSON))
+	if err != nil {
+		http.Error(responseWriter, "Failed to track request", http.StatusInternalServerError)
+		return
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			return
+		}
+	}()
+
+	// Check the response status code from the external API
+	if resp.StatusCode != http.StatusOK {
+		http.Error(responseWriter, "Failed to track request", http.StatusInternalServerError)
+		return
+	}
+
 }
