@@ -78,5 +78,4 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 		http.Error(responseWriter, "Failed to track request", http.StatusInternalServerError)
 		return
 	}
-
 }
