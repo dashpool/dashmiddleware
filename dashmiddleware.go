@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"log"
 	"net/http"
 )
 
@@ -36,6 +38,18 @@ func New(_ context.Context, next http.Handler, config *Config, name string) (htt
 	}, nil
 }
 
+// CapturingResponseWriter a ResponseWriter that knows its response.
+type CapturingResponseWriter struct {
+	http.ResponseWriter
+	Body []byte
+}
+
+func (w *CapturingResponseWriter) Write(b []byte) (int, error) {
+	// Capture the response body
+	w.Body = append(w.Body, b...)
+	return w.ResponseWriter.Write(b)
+}
+
 func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http.Request) {
 	// Use the context from the incoming request
 	ctx := req.Context()
@@ -43,39 +57,53 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	_, cancel := context.WithTimeout(ctx, 10)
 	defer cancel()
 
+	// Create a capturing response writer
+	capturingWriter := &CapturingResponseWriter{
+		ResponseWriter: responseWriter, Body: []byte{},
+	}
+
 	// Continue the request down the middleware chain
-	c.next.ServeHTTP(responseWriter, req)
+	// c.next.ServeHTTP(responseWriter, req)
+	c.next.ServeHTTP(capturingWriter, req)
+
+	url := req.URL.String()
+
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		log.Printf("Failed to read request body: %v", err)
+		return
+	}
 
 	// Define the JSON payload to send in the request body
 	payload := map[string]interface{}{
-		"Request": "SomeRequestValue",
-		"Result":  "SomeResultValue",
-		"URL":     req.URL.String(),
+		"Request": string(body),
+		"Result":  string(capturingWriter.Body),
+		"URL":     url,
 		"User":    "SomeUserValue",
 	}
 
 	// Marshal the payload into a JSON string
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
-		http.Error(responseWriter, "Failed to create JSON payload", http.StatusInternalServerError)
+		log.Printf("Failed to create JSON payload: %v", err)
 		return
 	}
 
 	// Make a request to the external REST API to track the request
 	resp, err := http.Post(c.trackURL, "application/json", bytes.NewBuffer(payloadJSON))
 	if err != nil {
-		http.Error(responseWriter, "Failed to track request", http.StatusInternalServerError)
+		log.Printf("Failed to track request: %v", err)
 		return
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
-			return
+			log.Printf("Error closing response body: %v", closeErr)
 		}
 	}()
 
 	// Check the response status code from the external API
 	if resp.StatusCode != http.StatusOK {
-		http.Error(responseWriter, "Failed to track request", http.StatusInternalServerError)
+		log.Printf("Failed to track request. Status Code: %d", resp.StatusCode)
 		return
 	}
 }
