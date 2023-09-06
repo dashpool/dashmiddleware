@@ -26,21 +26,25 @@ func CreateConfig() *Config {
 
 // DashMiddleware a DashMiddleware plugin.
 type DashMiddleware struct {
-	next        http.Handler
-	trackURL    string
-	name        string
-	splitRegexp *regexp.Regexp
+	next     http.Handler
+	trackURL string
+	name     string
 }
 
 // New creates a new DashMiddleware plugin.
 func New(_ context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	return &DashMiddleware{
-		trackURL:    config.TrackURL,
-		next:        next,
-		name:        name,
-		splitRegexp: regexp.MustCompile(` *([^=;]+?) *=[^;]+`),
+		trackURL: config.TrackURL,
+		next:     next,
+		name:     name,
 	}, nil
 }
+
+// Define the regular expressions globally.
+var (
+	splitRegexp = regexp.MustCompile(` *([^=;]+?) *=[^;]+`)
+	frameRegex  = regexp.MustCompile(`(?:.*[?&]frame=)([^&]+)`)
+)
 
 // CapturingResponseWriter a ResponseWriter that knows its response.
 type CapturingResponseWriter struct {
@@ -61,7 +65,7 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 
 	// restore non auth cookies
 	for _, cookieLine := range cookies {
-		cookies := c.splitRegexp.FindAllStringSubmatch(cookieLine, -1)
+		cookies := splitRegexp.FindAllStringSubmatch(cookieLine, -1)
 		var keep []string
 		for _, cookie := range cookies {
 			if !strings.HasPrefix(cookie[1], "_oauth2_proxy") {
@@ -77,6 +81,14 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	email := req.Header.Values("X-Auth-Request-Email")
 	groups := req.Header.Values("X-Auth-Request-Groups")
 	req.Header.Del("X-Auth-Request-Groups")
+
+	// Get the frame info from the referrer
+	referer := req.Header.Get("Referer")
+	matches := frameRegex.FindStringSubmatch(referer)
+	frame := ""
+	if len(matches) > 1 {
+		frame = matches[1]
+	}
 
 	// Use the context from the incoming request
 	ctx := req.Context()
@@ -115,6 +127,7 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 			"URL":     url,
 			"Email":   email,
 			"Groups":  groups,
+			"Frame":   frame,
 		}
 
 		// Marshal the payload into a JSON string
