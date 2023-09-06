@@ -65,7 +65,7 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 		var keep []string
 		for _, cookie := range cookies {
 			if !strings.HasPrefix(cookie[1], "_oauth2_proxy") {
-				keep = append(keep, cookieLine)
+				keep = append(keep, cookie[0])
 			}
 		}
 		if len(keep) > 0 {
