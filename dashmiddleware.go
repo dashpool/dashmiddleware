@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 )
 
@@ -25,17 +26,19 @@ func CreateConfig() *Config {
 
 // DashMiddleware a DashMiddleware plugin.
 type DashMiddleware struct {
-	next     http.Handler
-	trackURL string
-	name     string
+	next        http.Handler
+	trackURL    string
+	name        string
+	splitRegexp *regexp.Regexp
 }
 
 // New creates a new DashMiddleware plugin.
 func New(_ context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	return &DashMiddleware{
-		trackURL: config.TrackURL,
-		next:     next,
-		name:     name,
+		trackURL:    config.TrackURL,
+		next:        next,
+		name:        name,
+		splitRegexp: regexp.MustCompile(` *([^=;]+?) *=[^;]+`),
 	}, nil
 }
 
@@ -52,6 +55,29 @@ func (w *CapturingResponseWriter) Write(b []byte) (int, error) {
 }
 
 func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http.Request) {
+	// handle auth cookies
+	cookies := req.Header.Values("cookie")
+	req.Header.Del("cookie")
+
+	// restore non auth cookies
+	for _, cookieLine := range cookies {
+		cookies := c.splitRegexp.FindAllStringSubmatch(cookieLine, -1)
+		var keep []string
+		for _, cookie := range cookies {
+			if !strings.HasPrefix(cookie[1], "_oauth2_proxy") {
+				keep = append(keep, cookieLine)
+			}
+		}
+		if len(keep) > 0 {
+			req.Header.Add("cookie", strings.TrimSpace(strings.Join(keep, ";")))
+		}
+	}
+
+	// Get user information and remove groups (since they might be long)
+	email := req.Header.Values("X-Auth-Request-Email")
+	groups := req.Header.Values("X-Auth-Request-Groups")
+	req.Header.Del("X-Auth-Request-Groups")
+
 	// Use the context from the incoming request
 	ctx := req.Context()
 
@@ -87,7 +113,8 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 			"Request": string(body),
 			"Result":  string(capturingWriter.Body),
 			"URL":     url,
-			"User":    "SomeUserValue",
+			"Email":   email,
+			"Groups":  groups,
 		}
 
 		// Marshal the payload into a JSON string
