@@ -14,29 +14,38 @@ import (
 
 // Config the plugin configuration.
 type Config struct {
-	TrackURL string
+	TrackURL     string
+	RecordedURLs []string
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
 	return &Config{
-		TrackURL: "http://backand.dashpool-system:8080/track",
+		TrackURL:     "http://backand.dashpool-system:8080/track",
+		RecordedURLs: []string{"/_dash-update-component"},
 	}
 }
 
 // DashMiddleware a DashMiddleware plugin.
 type DashMiddleware struct {
-	next     http.Handler
-	trackURL string
-	name     string
+	next            http.Handler
+	trackURL        string
+	name            string
+	recordedURLsMap map[string]struct{}
 }
 
 // New creates a new DashMiddleware plugin.
 func New(_ context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
+	recordedURLsMap := make(map[string]struct{})
+	for _, url := range config.RecordedURLs {
+		recordedURLsMap[url] = struct{}{}
+	}
+
 	return &DashMiddleware{
-		trackURL: config.TrackURL,
-		next:     next,
-		name:     name,
+		trackURL:        config.TrackURL,
+		next:            next,
+		name:            name,
+		recordedURLsMap: recordedURLsMap,
 	}, nil
 }
 
@@ -115,11 +124,7 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 
 	url := req.URL.String()
 
-	// Check if the URL ends with "/_dash-update-component"
-	if strings.HasSuffix(url, "/_dash-update-component") {
-		// Remove "/_dash-update-component" from the URL
-		url = strings.TrimSuffix(url, "/_dash-update-component")
-
+	if _, ok := c.recordedURLsMap[url]; ok {
 		// Define the JSON payload to send in the request body
 		payload := map[string]interface{}{
 			"Request": string(body),
