@@ -14,8 +14,8 @@ import (
 
 // Config the plugin configuration.
 type Config struct {
-	TrackURL     string   `json:"trackurl,omitempty"`
-	RecordedURLs []string `json:"recorded,omitempty"`
+	TrackURL     string   `yaml:"trackurl"`
+	RecordedURLs []string `yaml:"recorded"`
 }
 
 // CreateConfig creates the default plugin configuration.
@@ -28,24 +28,19 @@ func CreateConfig() *Config {
 
 // DashMiddleware a DashMiddleware plugin.
 type DashMiddleware struct {
-	next            http.Handler
-	trackURL        string
-	name            string
-	recordedURLsMap map[string]struct{}
+	next         http.Handler
+	trackURL     string
+	name         string
+	recordedURLs []string
 }
 
 // New creates a new DashMiddleware plugin.
 func New(_ context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
-	recordedURLsMap := make(map[string]struct{})
-	for _, url := range config.RecordedURLs {
-		recordedURLsMap[url] = struct{}{}
-	}
-
 	return &DashMiddleware{
-		trackURL:        config.TrackURL,
-		next:            next,
-		name:            name,
-		recordedURLsMap: recordedURLsMap,
+		trackURL:     config.TrackURL,
+		next:         next,
+		name:         name,
+		recordedURLs: config.RecordedURLs,
 	}, nil
 }
 
@@ -124,7 +119,16 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 
 	url := req.URL.String()
 
-	if _, ok := c.recordedURLsMap[url]; ok {
+	// Check if the URL matches any of the RecordedURLs
+	matched := false
+	for _, recordedURL := range c.recordedURLs {
+		if strings.HasSuffix(url, recordedURL) {
+			matched = true
+			break
+		}
+	}
+
+	if matched {
 		// Define the JSON payload to send in the request body
 		payload := map[string]interface{}{
 			"Request": string(body),
