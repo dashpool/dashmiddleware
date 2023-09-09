@@ -29,6 +29,10 @@ metadata:
 spec:
   plugin:
     dashmiddleware:
-      mongohost: mongo:2701
+      trackurl: http://backend.dashpool-system:8080/track
+      recorded:
+        - _dash-update-component
+        - plotApi
+
 
 ```

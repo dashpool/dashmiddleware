@@ -14,14 +14,14 @@ import (
 
 // Config the plugin configuration.
 type Config struct {
-	TrackURL     string
-	RecordedURLs []string
+	TrackURL     string   `json:"trackurl,omitempty"`
+	RecordedURLs []string `json:"recorded,omitempty"`
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
 	return &Config{
-		TrackURL:     "http://backand.dashpool-system:8080/track",
+		TrackURL:     "http://backend.dashpool-system:8080/track",
 		RecordedURLs: []string{"/_dash-update-component"},
 	}
 }
