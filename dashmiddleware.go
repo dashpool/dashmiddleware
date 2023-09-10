@@ -15,13 +15,15 @@ import (
 // Config the plugin configuration.
 type Config struct {
 	TrackURL     string   `yaml:"trackurl"`
-	RecordedURLs []string `yaml:"recorded"`
+	StateURL     string   `yaml:"stateurl"`
+	RecordedURLs []string `yaml:"recordedurls"`
 }
 
 // CreateConfig creates the default plugin configuration.
 func CreateConfig() *Config {
 	return &Config{
 		TrackURL:     "http://backend.dashpool-system:8080/track",
+		StateURL:     "http://backend.dashpool-system:8080/state",
 		RecordedURLs: []string{"/_dash-update-component"},
 	}
 }
@@ -30,6 +32,7 @@ func CreateConfig() *Config {
 type DashMiddleware struct {
 	next         http.Handler
 	trackURL     string
+	stateURL     string
 	name         string
 	recordedURLs []string
 }
@@ -38,6 +41,7 @@ type DashMiddleware struct {
 func New(_ context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	return &DashMiddleware{
 		trackURL:     config.TrackURL,
+		stateURL:     config.StateURL,
 		next:         next,
 		name:         name,
 		recordedURLs: config.RecordedURLs,
@@ -48,6 +52,7 @@ func New(_ context.Context, next http.Handler, config *Config, name string) (htt
 var (
 	splitRegexp = regexp.MustCompile(` *([^=;]+?) *=[^;]+`)
 	frameRegex  = regexp.MustCompile(`(?:.*[?&]frame=)([^&]+)`)
+	stateRegex  = regexp.MustCompile(`(?:.*[?&]state=)([^&]+)`)
 )
 
 // CapturingResponseWriter a ResponseWriter that knows its response.
@@ -93,10 +98,14 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	if len(matches) > 1 {
 		frame = matches[1]
 	}
+	matches = stateRegex.FindStringSubmatch(referer)
+	state := ""
+	if len(matches) > 1 {
+		state = matches[1]
+	}
 
 	// Use the context from the incoming request
 	ctx := req.Context()
-
 	_, cancel := context.WithTimeout(ctx, 10)
 	defer cancel()
 
@@ -109,17 +118,8 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	// Restore the original request body for downstream handlers
 	req.Body = io.NopCloser(bytes.NewBuffer(body))
 
-	// Create a capturing response writer
-	capturingWriter := &CapturingResponseWriter{
-		ResponseWriter: responseWriter, Body: []byte{},
-	}
-
-	// Continue the request down the middleware chain
-	c.next.ServeHTTP(capturingWriter, req)
-
-	url := req.URL.String()
-
 	// Check if the URL matches any of the RecordedURLs
+	url := req.URL.String()
 	matched := false
 	for _, recordedURL := range c.recordedURLs {
 		if strings.HasSuffix(url, recordedURL) {
@@ -128,6 +128,43 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 		}
 	}
 
+	// If the state is not empty and the URL matches, send the request to stateURL
+	if state != "" && matched {
+		stateURL := c.stateURL + "?state=" + state
+		resp, err := http.Post(stateURL, "application/json", bytes.NewBuffer(body)) //nolint
+		if err != nil {
+			log.Printf("Failed to send request to stateURL: %v", err)
+			return
+		}
+		defer func() {
+			if closeErr := resp.Body.Close(); closeErr != nil {
+				log.Printf("Error closing response body: %v", closeErr)
+			}
+		}()
+
+		// Check the response status code from the external API
+		if resp.StatusCode != http.StatusOK {
+			log.Printf("Failed to send request to stateURL. Status Code: %d", resp.StatusCode)
+			return
+		}
+
+		// Copy the response from resp to responseWriter and return
+		_, copyErr := io.Copy(responseWriter, resp.Body)
+		if copyErr != nil {
+			log.Printf("Failed to copy response to responseWriter: %v", copyErr)
+		}
+		return
+	}
+
+	// Create a capturing response writer
+	capturingWriter := &CapturingResponseWriter{
+		ResponseWriter: responseWriter, Body: []byte{},
+	}
+
+	// Continue the request down the middleware chain
+	c.next.ServeHTTP(capturingWriter, req)
+
+	// if we have a url request we have to record
 	if matched {
 		// Define the JSON payload to send in the request body
 		payload := map[string]interface{}{
