@@ -27,6 +27,8 @@ linters-settings:
       - FIXME
   gofumpt:
     extra-rules: true
+  nestif:
+    min-complexity: 6
 
 linters:
   enable-all: true

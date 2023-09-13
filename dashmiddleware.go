@@ -15,7 +15,7 @@ import (
 // Config the plugin configuration.
 type Config struct {
 	TrackURL     string   `yaml:"trackurl"`
-	StateURL     string   `yaml:"stateurl"`
+	LayoutURL    string   `yaml:"layouturl"`
 	RecordedURLs []string `yaml:"recordedurls"`
 }
 
@@ -23,8 +23,8 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		TrackURL:     "http://backend.dashpool-system:8080/track",
-		StateURL:     "http://backend.dashpool-system:8080/state",
-		RecordedURLs: []string{"/_dash-update-component"},
+		LayoutURL:    "http://backend.dashpool-system:8080/getlayout",
+		RecordedURLs: []string{"/_dash-update-component", "/_dash-layout"},
 	}
 }
 
@@ -32,7 +32,7 @@ func CreateConfig() *Config {
 type DashMiddleware struct {
 	next         http.Handler
 	trackURL     string
-	stateURL     string
+	layoutURL    string
 	name         string
 	recordedURLs []string
 }
@@ -41,18 +41,24 @@ type DashMiddleware struct {
 func New(_ context.Context, next http.Handler, config *Config, name string) (http.Handler, error) {
 	return &DashMiddleware{
 		trackURL:     config.TrackURL,
-		stateURL:     config.StateURL,
+		layoutURL:    config.LayoutURL,
 		next:         next,
 		name:         name,
 		recordedURLs: config.RecordedURLs,
 	}, nil
 }
 
+// LayoutRequestData needed to get a layout from the backend server.
+type LayoutRequestData struct {
+	Email  []string `json:"email"`
+	Layout string   `json:"layout"`
+}
+
 // Define the regular expressions globally.
 var (
 	splitRegexp = regexp.MustCompile(` *([^=;]+?) *=[^;]+`)
 	frameRegex  = regexp.MustCompile(`(?:.*[?&]frame=)([^&]+)`)
-	stateRegex  = regexp.MustCompile(`(?:.*[?&]state=)([^&]+)`)
+	layoutRegex = regexp.MustCompile(`(?:.*[?&]layout=)([^&]+)`)
 )
 
 // CapturingResponseWriter a ResponseWriter that knows its response.
@@ -98,10 +104,10 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	if len(matches) > 1 {
 		frame = matches[1]
 	}
-	matches = stateRegex.FindStringSubmatch(referer)
-	state := ""
+	matches = layoutRegex.FindStringSubmatch(referer)
+	layout := ""
 	if len(matches) > 1 {
-		state = matches[1]
+		layout = matches[1]
 	}
 
 	// Use the context from the incoming request
@@ -120,20 +126,24 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 
 	// Check if the URL matches any of the RecordedURLs
 	url := req.URL.String()
-	matched := false
-	for _, recordedURL := range c.recordedURLs {
-		if strings.HasSuffix(url, recordedURL) {
-			matched = true
-			break
-		}
-	}
 
-	// If the state is not empty and the URL matches, send the request to stateURL
-	if state != "" && matched {
-		stateURL := c.stateURL + "?state=" + state
-		resp, err := http.Post(stateURL, "application/json", bytes.NewBuffer(body)) //nolint
+	// If the layout is not empty and the URL matches, send the request to layoutURL
+	if layout != "" && strings.HasSuffix(url, "/_dash-layout") {
+		requestData := LayoutRequestData{
+			Email:  email,
+			Layout: layout,
+		}
+
+		// Serialize the request data to JSON
+		requestBody, err := json.Marshal(requestData)
 		if err != nil {
-			log.Printf("Failed to send request to stateURL: %v", err)
+			log.Printf("Failed to serialize request data to JSON: %v", err)
+			return
+		}
+
+		resp, err := http.Post(c.layoutURL, "application/json", bytes.NewBuffer(requestBody))
+		if err != nil {
+			log.Printf("Failed to send request to layoutURL: %v", err)
 			return
 		}
 		defer func() {
@@ -144,7 +154,7 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 
 		// Check the response status code from the external API
 		if resp.StatusCode != http.StatusOK {
-			log.Printf("Failed to send request to stateURL. Status Code: %d", resp.StatusCode)
+			log.Printf("Failed to send request to layoutURL. Status Code: %d", resp.StatusCode)
 			return
 		}
 
@@ -163,6 +173,14 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 
 	// Continue the request down the middleware chain
 	c.next.ServeHTTP(capturingWriter, req)
+
+	matched := false
+	for _, recordedURL := range c.recordedURLs {
+		if strings.HasSuffix(url, recordedURL) {
+			matched = true
+			break
+		}
+	}
 
 	// if we have a url request we have to record
 	if matched {

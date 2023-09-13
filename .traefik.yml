@@ -7,7 +7,11 @@ import: github.com/dashpool/dashmiddleware
 summary: 'Middleware to integrate dash apps into Dashpool'
 
 testData:
-  mongohost: mongo:2701
+  TrackURL: http://backend.dashpool-system:8080/track
+  LayoutURL: http://backend.dashpool-system:8080/getlayout
+  RecordedURLs:
+   - /_dash-update-component
+   - /_dash-layout
   
     
 
