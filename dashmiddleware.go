@@ -159,14 +159,17 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 		}
 
 		// Copy the response from resp to responseWriter and return
-
-		layout_body, err := io.ReadAll(resp.Body)
+		layoutBody, err := io.ReadAll(resp.Body)
 		if err != nil {
 			log.Printf("Failed to read layout body: %v", err)
 			return
 		}
 
-		responseWriter.Write(layout_body)
+		_, err = responseWriter.Write(layoutBody)
+		if err != nil {
+			log.Printf("Problem sending body to the responsewriter: %v", err)
+			return
+		}
 		return
 	}
 
