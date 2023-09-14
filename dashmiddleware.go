@@ -165,6 +165,7 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 			return
 		}
 
+		responseWriter.Header().Set("Content-Type", "application/json")
 		_, err = responseWriter.Write(layoutBody)
 		if err != nil {
 			log.Printf("Problem sending body to the responsewriter: %v", err)
