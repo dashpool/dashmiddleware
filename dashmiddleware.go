@@ -52,6 +52,7 @@ func New(_ context.Context, next http.Handler, config *Config, name string) (htt
 type LayoutRequestData struct {
 	Email  []string `json:"email"`
 	Layout string   `json:"layout"`
+	Frame  string   `json:"frame"`
 }
 
 // Define the regular expressions globally.
@@ -132,6 +133,7 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 		requestData := LayoutRequestData{
 			Email:  email,
 			Layout: layout,
+			Frame:  frame,
 		}
 
 		// Serialize the request data to JSON
