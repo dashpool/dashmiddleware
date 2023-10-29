@@ -141,15 +141,15 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 		}
 
 		// Serialize the request data to JSON
-		requestBody, err := json.Marshal(requestData)
-		if err != nil {
-			log.Printf("Failed to serialize request data to JSON: %v", err)
+		requestBody, jsonReqErr := json.Marshal(requestData)
+		if jsonReqErr != nil {
+			log.Printf("Failed to serialize request data to JSON: %v", jsonReqErr)
 			return
 		}
 
-		resp, err := http.Post(c.layoutURL, "application/json", bytes.NewBuffer(requestBody))
-		if err != nil {
-			log.Printf("Failed to send request to layoutURL: %v", err)
+		resp, postErr := http.Post(c.layoutURL, "application/json", bytes.NewBuffer(requestBody))
+		if postErr != nil {
+			log.Printf("Failed to send request to layoutURL: %v", postErr)
 			return
 		}
 		defer func() {
@@ -165,9 +165,9 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 		}
 
 		// Copy the response from resp to responseWriter and return
-		layoutBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			log.Printf("Failed to read layout body: %v", err)
+		layoutBody, readAllErr := io.ReadAll(resp.Body)
+		if readAllErr != nil {
+			log.Printf("Failed to read layout body: %v", readAllErr)
 			return
 		}
 
@@ -221,8 +221,16 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 
 	if resp.StatusCode == http.StatusOK {
 		// Capture the response and use it as the response
-		io.Copy(responseWriter, resp.Body)
-		resp.Body.Close()
+		_, copyErr := io.Copy(responseWriter, resp.Body)
+		if copyErr != nil {
+			log.Printf("Failed to copy response body: %v", copyErr)
+			return
+		}
+		closeErr := resp.Body.Close()
+		if closeErr != nil {
+			log.Printf("Failed to close response: %v", closeErr)
+			return
+		}
 	} else {
 		// Continue the request down the middleware chain with the capturing response writer
 		c.next.ServeHTTP(capturingWriter, req)
