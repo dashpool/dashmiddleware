@@ -16,6 +16,7 @@ import (
 type Config struct {
 	TrackURL     string   `yaml:"trackurl"`
 	LayoutURL    string   `yaml:"layouturl"`
+	ResultURL    string   `yaml:"resulturl"`
 	RecordedURLs []string `yaml:"recordedurls"`
 }
 
@@ -23,6 +24,7 @@ type Config struct {
 func CreateConfig() *Config {
 	return &Config{
 		TrackURL:     "http://backend.dashpool-system:8080/track",
+		ResultURL:    "http://backend.dashpool-system:8080/result",
 		LayoutURL:    "http://backend.dashpool-system:8080/getlayout",
 		RecordedURLs: []string{"/_dash-update-component", "/_dash-layout"},
 	}
@@ -33,6 +35,7 @@ type DashMiddleware struct {
 	next         http.Handler
 	trackURL     string
 	layoutURL    string
+	resultURL    string
 	name         string
 	recordedURLs []string
 }
@@ -42,6 +45,7 @@ func New(_ context.Context, next http.Handler, config *Config, name string) (htt
 	return &DashMiddleware{
 		trackURL:     config.TrackURL,
 		layoutURL:    config.LayoutURL,
+		resultURL:    config.ResultURL,
 		next:         next,
 		name:         name,
 		recordedURLs: config.RecordedURLs,
@@ -176,14 +180,7 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 		return
 	}
 
-	// Create a capturing response writer
-	capturingWriter := &CapturingResponseWriter{
-		ResponseWriter: responseWriter, Body: []byte{},
-	}
-
-	// Continue the request down the middleware chain
-	c.next.ServeHTTP(capturingWriter, req)
-
+	// find out if the url is in the recorded ones
 	matched := false
 	for _, recordedURL := range c.recordedURLs {
 		if strings.HasSuffix(url, recordedURL) {
@@ -192,41 +189,77 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 		}
 	}
 
-	// if we have a url request we have to record
-	if matched {
-		// Define the JSON payload to send in the request body
-		payload := map[string]interface{}{
-			"Request": string(body),
-			"Result":  string(capturingWriter.Body),
-			"URL":     url,
-			"Email":   email,
-			"Groups":  groups,
-			"Frame":   frame,
-		}
+	if !matched {
+		c.next.ServeHTTP(responseWriter, req)
+		return
+	}
 
-		// Marshal the payload into a JSON string
-		payloadJSON, err := json.Marshal(payload)
-		if err != nil {
-			log.Printf("Failed to create JSON payload: %v", err)
-			return
-		}
+	// Create a capturing response writer
+	capturingWriter := &CapturingResponseWriter{
+		ResponseWriter: responseWriter,
+		Body:           []byte{},
+	}
 
-		// Make a request to the external REST API to track the request
-		resp, err := http.Post(c.trackURL, "application/json", bytes.NewBuffer(payloadJSON))
-		if err != nil {
-			log.Printf("Failed to track request: %v", err)
-			return
-		}
-		defer func() {
-			if closeErr := resp.Body.Close(); closeErr != nil {
-				log.Printf("Error closing response body: %v", closeErr)
-			}
-		}()
+	payload := map[string]interface{}{
+		"Request": string(body),
+		"URL":     url,
+	}
 
-		// Check the response status code from the external API
-		if resp.StatusCode != http.StatusOK {
-			log.Printf("Failed to track request. Status Code: %d", resp.StatusCode)
-			return
+	// Marshal the payload into a JSON string
+	payloadJSON, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("Failed to create JSON payload: %v", err)
+		return
+	}
+
+	// Make a request to the external REST API to check for a recorded result
+	resp, err := http.Post(c.resultURL, "application/json", bytes.NewBuffer(payloadJSON))
+	if err != nil {
+		log.Printf("Failed to track request: %v", err)
+		return
+	}
+
+	if resp.StatusCode == http.StatusOK {
+		// Capture the response and use it as the response
+		io.Copy(responseWriter, resp.Body)
+		resp.Body.Close()
+	} else {
+		// Continue the request down the middleware chain with the capturing response writer
+		c.next.ServeHTTP(capturingWriter, req)
+	}
+
+	// Define the JSON payload to send in the request body
+	payload = map[string]interface{}{
+		"Request": string(body),
+		"Result":  string(capturingWriter.Body),
+		"URL":     url,
+		"Email":   email,
+		"Groups":  groups,
+		"Frame":   frame,
+	}
+
+	// Marshal the payload into a JSON string
+	payloadJSON, err = json.Marshal(payload)
+	if err != nil {
+		log.Printf("Failed to create JSON payload: %v", err)
+		return
+	}
+
+	// Make a request to the external REST API to track the request
+	resp, err = http.Post(c.trackURL, "application/json", bytes.NewBuffer(payloadJSON))
+	if err != nil {
+		log.Printf("Failed to track request: %v", err)
+		return
+	}
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			log.Printf("Error closing response body: %v", closeErr)
 		}
+	}()
+
+	// Check the response status code from the external API
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Failed to track request. Status Code: %d", resp.StatusCode)
+		return
 	}
 }
