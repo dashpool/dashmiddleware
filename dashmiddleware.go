@@ -213,13 +213,14 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	}
 
 	// Make a request to the external REST API to check for a recorded result
+	cached := false
 	resp, err := http.Post(c.resultURL, "application/json", bytes.NewBuffer(payloadJSON))
 	if err != nil {
-		log.Printf("Failed to track request: %v", err)
-		return
+		log.Printf("Failed to get cached request: %v", err)
 	}
 
 	if resp.StatusCode == http.StatusOK {
+		cached = true
 		// Capture the response and use it as the response
 		_, copyErr := io.Copy(responseWriter, resp.Body)
 		if copyErr != nil {
@@ -244,6 +245,7 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 		"Email":   email,
 		"Groups":  groups,
 		"Frame":   frame,
+		"Cached":  cached,
 	}
 
 	// Marshal the payload into a JSON string
