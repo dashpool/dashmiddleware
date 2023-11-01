@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // Config the plugin configuration.
@@ -79,6 +80,10 @@ func (w *CapturingResponseWriter) Write(b []byte) (int, error) {
 }
 
 func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http.Request) {
+	// Start a timer to measure the duration
+	var duration float64
+	startTime := time.Now()
+
 	// handle auth cookies
 	cookies := req.Header.Values("cookie")
 	req.Header.Del("cookie")
@@ -237,15 +242,19 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 		c.next.ServeHTTP(capturingWriter, req)
 	}
 
+	// Calculate the duration
+	duration = time.Since(startTime).Seconds()
+
 	// Define the JSON payload to send in the request body
 	payload = map[string]interface{}{
-		"Request": string(body),
-		"Result":  string(capturingWriter.Body),
-		"URL":     url,
-		"Email":   email,
-		"Groups":  groups,
-		"Frame":   frame,
-		"Cached":  cached,
+		"Request":  string(body),
+		"Result":   string(capturingWriter.Body),
+		"URL":      url,
+		"Email":    email,
+		"Groups":   groups,
+		"Frame":    frame,
+		"Cached":   cached,
+		"Duration": duration,
 	}
 
 	// Marshal the payload into a JSON string
