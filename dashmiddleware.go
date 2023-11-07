@@ -227,7 +227,7 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	if resp.StatusCode == http.StatusOK {
 		cached = true
 		// Capture the response and use it as the response
-		_, copyErr := io.Copy(responseWriter, resp.Body)
+		_, copyErr := io.Copy(capturingWriter, resp.Body)
 		if copyErr != nil {
 			log.Printf("Failed to copy response body: %v", copyErr)
 			return
