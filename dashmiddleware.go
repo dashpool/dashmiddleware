@@ -272,11 +272,8 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	}
 
 	// Copy headers from the original request to the new request
-	for key, values := range resp.Header {
-		for _, value := range values {
-			trackReq.Header.Add(key, value)
-		}
-	}
+	expires := capturingWriter.ResponseWriter.Header().Get("Expires")
+	trackReq.Header.Add("Expires", expires)
 
 	// Set the Content-Type header for the new request
 	trackReq.Header.Set("Content-Type", "application/json")
