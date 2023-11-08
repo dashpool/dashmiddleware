@@ -272,7 +272,7 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	}
 
 	// Copy headers from the original request to the new request
-	for key, values := range req.Header {
+	for key, values := range resp.Header {
 		for _, value := range values {
 			trackReq.Header.Add(key, value)
 		}
