@@ -257,8 +257,15 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 		"Duration": duration,
 	}
 
+	// Marshal the payload into a JSON string
+	payloadJSON, err = json.Marshal(payload)
+	if err != nil {
+		log.Printf("Failed to create JSON payload: %v", err)
+		return
+	}
+
 	// Create a new request for the external REST API
-	apiReq, err := http.NewRequest("POST", c.trackURL, bytes.NewBuffer(payloadJSON))
+	trackReq, err := http.NewRequest(http.MethodPost, c.trackURL, bytes.NewBuffer(payloadJSON))
 	if err != nil {
 		log.Printf("Failed to create API request: %v", err)
 		return
@@ -267,15 +274,15 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	// Copy headers from the original request to the new request
 	for key, values := range req.Header {
 		for _, value := range values {
-			apiReq.Header.Add(key, value)
+			trackReq.Header.Add(key, value)
 		}
 	}
 
 	// Set the Content-Type header for the new request
-	apiReq.Header.Set("Content-Type", "application/json")
+	trackReq.Header.Set("Content-Type", "application/json")
 
 	// Make a request to the external REST API with headers from the original request
-	resp, err = http.DefaultClient.Do(apiReq)
+	resp, err = http.DefaultClient.Do(trackReq)
 	if err != nil {
 		log.Printf("Failed to track request: %v", err)
 		return

@@ -33,6 +33,7 @@ linters-settings:
 linters:
   enable-all: true
   disable:
+    - maintidx
     - goimports
     - interfacer # deprecated
     - maligned # deprecated
