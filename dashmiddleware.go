@@ -62,9 +62,10 @@ type LayoutRequestData struct {
 
 // Define the regular expressions globally.
 var (
-	splitRegexp = regexp.MustCompile(` *([^=;]+?) *=[^;]+`)
-	frameRegex  = regexp.MustCompile(`(?:.*[?&]frame=)([^&]+)`)
-	layoutRegex = regexp.MustCompile(`(?:.*[?&]layout=)([^&]+)`)
+	splitRegexp  = regexp.MustCompile(` *([^=;]+?) *=[^;]+`)
+	frameRegex   = regexp.MustCompile(`(?:.*[?&]frame=)([^&]+)`)
+	layoutRegex  = regexp.MustCompile(`(?:.*[?&]layout=)([^&]+)`)
+	baseURLRegex = regexp.MustCompile(`https:\/\/[^\/]+(.+?)\/\?`)
 )
 
 // CapturingResponseWriter a ResponseWriter that knows its response.
@@ -118,6 +119,11 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	layout := ""
 	if len(matches) > 1 {
 		layout = matches[1]
+	}
+	matches = baseURLRegex.FindStringSubmatch(referer)
+	refererBase := ""
+	if len(matches) > 1 {
+		refererBase = matches[1]
 	}
 
 	// Use the context from the incoming request
@@ -247,14 +253,15 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 
 	// Define the JSON payload to send in the request body
 	payload = map[string]interface{}{
-		"Request":  string(body),
-		"Result":   string(capturingWriter.Body),
-		"URL":      url,
-		"Email":    email,
-		"Groups":   groups,
-		"Frame":    frame,
-		"Cached":   cached,
-		"Duration": duration,
+		"Request":     string(body),
+		"Result":      string(capturingWriter.Body),
+		"URL":         url,
+		"Email":       email,
+		"Groups":      groups,
+		"Frame":       frame,
+		"Cached":      cached,
+		"Duration":    duration,
+		"RefererBase": refererBase,
 	}
 
 	// Marshal the payload into a JSON string
