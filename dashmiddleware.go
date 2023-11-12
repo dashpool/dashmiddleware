@@ -243,6 +243,7 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 			log.Printf("Failed to close response: %v", closeErr)
 			return
 		}
+		responseWriter.Header().Set("Content-Type", "application/json")
 	} else {
 		// Continue the request down the middleware chain with the capturing response writer
 		c.next.ServeHTTP(capturingWriter, req)
