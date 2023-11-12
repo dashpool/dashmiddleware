@@ -232,6 +232,16 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 
 	if resp.StatusCode == http.StatusOK {
 		cached = true
+		// copy the header
+		for key, values := range resp.Header {
+			for _, value := range values {
+				responseWriter.Header().Add(key, value)
+			}
+		}
+	
+		// Set the status code
+		responseWriter.WriteHeader(http.StatusOK)
+
 		// Capture the response and use it as the response
 		_, copyErr := io.Copy(capturingWriter, resp.Body)
 		if copyErr != nil {
@@ -243,7 +253,7 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 			log.Printf("Failed to close response: %v", closeErr)
 			return
 		}
-		responseWriter.Header().Set("Content-Type", "application/json")
+
 	} else {
 		// Continue the request down the middleware chain with the capturing response writer
 		c.next.ServeHTTP(capturingWriter, req)
