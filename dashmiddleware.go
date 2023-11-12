@@ -238,7 +238,7 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 				responseWriter.Header().Add(key, value)
 			}
 		}
-	
+
 		// Set the status code
 		responseWriter.WriteHeader(http.StatusOK)
 
@@ -253,7 +253,6 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 			log.Printf("Failed to close response: %v", closeErr)
 			return
 		}
-
 	} else {
 		// Continue the request down the middleware chain with the capturing response writer
 		c.next.ServeHTTP(capturingWriter, req)
