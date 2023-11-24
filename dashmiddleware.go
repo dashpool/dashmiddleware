@@ -108,6 +108,11 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	groups := req.Header.Values("X-Auth-Request-Groups")
 	req.Header.Del("X-Auth-Request-Groups")
 
+	// Get the long callback header
+	longcallback := req.Header.Values("X-Longcallback")
+	req.Header.Del("X-Longcallback")
+	isLongCallback := len(longcallback) > 0
+
 	// Get the frame info from the referrer
 	referer := req.Header.Get("Referer")
 	matches := frameRegex.FindStringSubmatch(referer)
@@ -212,8 +217,9 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	}
 
 	payload := map[string]interface{}{
-		"Request": string(body),
-		"URL":     url,
+		"Request":      string(body),
+		"URL":          url,
+		"longcallback": isLongCallback,
 	}
 
 	// Marshal the payload into a JSON string
@@ -254,6 +260,12 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 			return
 		}
 	} else {
+		// If we have a long callback, we send back a 202 and put the request in the queue
+		if isLongCallback {
+			responseWriter.WriteHeader(http.StatusAccepted)
+			return
+		}
+
 		// Continue the request down the middleware chain with the capturing response writer
 		c.next.ServeHTTP(capturingWriter, req)
 	}
