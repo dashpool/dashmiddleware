@@ -284,6 +284,7 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 		"Cached":      cached,
 		"Duration":    duration,
 		"RefererBase": refererBase,
+		
 	}
 
 	// Marshal the payload into a JSON string
@@ -309,14 +310,15 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	trackReq.Header.Set("Content-Type", contentType)
 
 	// Check if the data is compressed
-	if capturingWriter.ResponseWriter.Header().Get("Content-Encoding") == "gzip" {
+	contentEncoding := capturingWriter.ResponseWriter.Header().Get("Content-Encoding")
+	if contentEncoding == "gzip" {
 		trackReq.Header.Set("Content-Encoding", "gzip")
 	}
 
 	// Make a request to the external REST API with headers from the original request
 	resp, err = http.DefaultClient.Do(trackReq)
 	if err != nil {
-		log.Printf("Failed to track request: %v", err)
+		log.Printf("Failed to track request: %v, URL: %s, Content-Type: %s, Encoding: %s", err, url, contentType, contentEncoding)
 		return
 	}
 	defer func() {
