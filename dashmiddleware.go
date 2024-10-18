@@ -305,7 +305,13 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	trackReq.Header.Add("Expires", expires)
 
 	// Set the Content-Type header for the new request
-	trackReq.Header.Set("Content-Type", "application/json")
+	contentType := capturingWriter.ResponseWriter.Header().Get("Content-Type")
+	trackReq.Header.Set("Content-Type", contentType)
+
+	// Check if the data is compressed
+	if capturingWriter.ResponseWriter.Header().Get("Content-Encoding") == "gzip" {
+		trackReq.Header.Set("Content-Encoding", "gzip")
+	}
 
 	// Make a request to the external REST API with headers from the original request
 	resp, err = http.DefaultClient.Do(trackReq)
