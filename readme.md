@@ -13,7 +13,7 @@ experimental:
   plugins:
     dashmiddleware:
       moduleName: "github.com/dashpool/dashmiddleware"
-      version: "v0.0.1"
+      version: "v0.0.30"
 ```
 
 ### Dynamic
