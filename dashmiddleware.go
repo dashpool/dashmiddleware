@@ -284,7 +284,6 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 		"Cached":      cached,
 		"Duration":    duration,
 		"RefererBase": refererBase,
-		
 	}
 
 	// Marshal the payload into a JSON string
