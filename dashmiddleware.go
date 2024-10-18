@@ -248,12 +248,34 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 		// Set the status code
 		responseWriter.WriteHeader(http.StatusOK)
 
-		// Capture the response and use it as the response
-		_, copyErr := io.Copy(capturingWriter, resp.Body)
-		if copyErr != nil {
-			log.Printf("Failed to copy response body: %v", copyErr)
-			return
+		// Check if the response is gzip encoded
+		if resp.Header.Get("Content-Encoding") == "gzip" {
+			gzipReader, err := gzip.NewReader(resp.Body)
+			if err != nil {
+				log.Printf("Failed to create gzip reader: %v", err)
+				return
+			}
+			defer func() {
+				if closeErr := gzipReader.Close(); closeErr != nil {
+					log.Printf("Failed to close gzip reader: %v", closeErr)
+				}
+			}()
+
+			// Capture the response and use it as the response
+			_, copyErr := io.Copy(capturingWriter, gzipReader)
+			if copyErr != nil {
+				log.Printf("Failed to copy gzip response body: %v", copyErr)
+				return
+			}
+		} else {
+			// Capture the response and use it as the response
+			_, copyErr := io.Copy(capturingWriter, resp.Body)
+			if copyErr != nil {
+				log.Printf("Failed to copy response body: %v", copyErr)
+				return
+			}
 		}
+
 		closeErr := resp.Body.Close()
 		if closeErr != nil {
 			log.Printf("Failed to close response: %v", closeErr)
