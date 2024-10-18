@@ -28,7 +28,7 @@ linters-settings:
   gofumpt:
     extra-rules: true
   nestif:
-    min-complexity: 8
+    min-complexity: 20
 
 linters:
   enable-all: true

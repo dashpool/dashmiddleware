@@ -262,8 +262,9 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 				}
 			}()
 
-			// Capture the response and use it as the response
-			_, copyErr := io.Copy(capturingWriter, gzipReader)
+			// Capture the response and use it as the response with a limit to prevent decompression bomb
+			limitedReader := io.LimitReader(gzipReader, 10<<20) // 10 MB limit
+			_, copyErr := io.Copy(capturingWriter, limitedReader)
 			if copyErr != nil {
 				log.Printf("Failed to copy gzip response body: %v", copyErr)
 				return
