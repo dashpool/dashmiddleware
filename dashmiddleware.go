@@ -3,6 +3,7 @@ package dashmiddleware
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"io"
