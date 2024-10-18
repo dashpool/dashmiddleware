@@ -251,9 +251,9 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 
 		// Check if the response is gzip encoded
 		if resp.Header.Get("Content-Encoding") == "gzip" {
-			gzipReader, err := gzip.NewReader(resp.Body)
-			if err != nil {
-				log.Printf("Failed to create gzip reader: %v", err)
+			gzipReader, zipErr := gzip.NewReader(resp.Body)
+			if zipErr != nil {
+				log.Printf("Failed to create gzip reader: %v", zipErr)
 				return
 			}
 			defer func() {
