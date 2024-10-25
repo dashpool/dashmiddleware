@@ -88,14 +88,14 @@ func decompressGzip(data []byte) string {
 		log.Fatalf("Failed to create Gzip reader: %v", err)
 	}
 	defer func() {
-		if err := reader.Close(); err != nil {
-			log.Printf("Failed to close Gzip reader: %v", err)
+		if closeerr := reader.Close(); closeerr != nil {
+			log.Printf("Failed to close Gzip reader: %v", closeerr)
 		}
 	}()
 
-	decodedBody, err := io.ReadAll(reader)
-	if err != nil {
-		log.Printf("Failed to read Gzip data: %v", err)
+	decodedBody, readerr := io.ReadAll(reader)
+	if readerr != nil {
+		log.Printf("Failed to read Gzip data: %v", readerr)
 	}
 
 	return string(decodedBody)
