@@ -316,7 +316,7 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 
 	contentEncoding := capturingWriter.ResponseWriter.Header().Get("Content-Encoding")
 	var result string
-	if isGzipped(capturingWriter.Body) { // Implement a function to check if it's Gzip
+	if contentEncoding == "gzip" {
 		result = decompressGzip(capturingWriter.Body)
 	} else {
 		result = string(capturingWriter.Body)
