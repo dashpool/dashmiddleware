@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"regexp"
@@ -82,17 +81,21 @@ func (w *CapturingResponseWriter) Write(b []byte) (int, error) {
 	return w.ResponseWriter.Write(b)
 }
 
-// Function to decompress Gzip data
+// Function to decompress Gzip data.
 func decompressGzip(data []byte) string {
 	reader, err := gzip.NewReader(bytes.NewBuffer(data))
 	if err != nil {
 		log.Fatalf("Failed to create Gzip reader: %v", err)
 	}
-	defer reader.Close()
+	defer func() {
+		if err := reader.Close(); err != nil {
+			log.Printf("Failed to close Gzip reader: %v", err)
+		}
+	}()
 
-	decodedBody, err := ioutil.ReadAll(reader)
+	decodedBody, err := io.ReadAll(reader)
 	if err != nil {
-		log.Fatalf("Failed to read Gzip data: %v", err)
+		log.Printf("Failed to read Gzip data: %v", err)
 	}
 
 	return string(decodedBody)
