@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"regexp"
@@ -79,6 +80,22 @@ func (w *CapturingResponseWriter) Write(b []byte) (int, error) {
 	// Capture the response body
 	w.Body = append(w.Body, b...)
 	return w.ResponseWriter.Write(b)
+}
+
+// Function to decompress Gzip data
+func decompressGzip(data []byte) string {
+	reader, err := gzip.NewReader(bytes.NewBuffer(data))
+	if err != nil {
+		log.Fatalf("Failed to create Gzip reader: %v", err)
+	}
+	defer reader.Close()
+
+	decodedBody, err := ioutil.ReadAll(reader)
+	if err != nil {
+		log.Fatalf("Failed to read Gzip data: %v", err)
+	}
+
+	return string(decodedBody)
 }
 
 func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http.Request) {
@@ -297,10 +314,18 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	// Calculate the duration
 	duration = time.Since(startTime).Seconds()
 
+	contentEncoding := capturingWriter.ResponseWriter.Header().Get("Content-Encoding")
+	var result string
+	if isGzipped(capturingWriter.Body) { // Implement a function to check if it's Gzip
+		result = decompressGzip(capturingWriter.Body)
+	} else {
+		result = string(capturingWriter.Body)
+	}
+
 	// Define the JSON payload to send in the request body
 	payload = map[string]interface{}{
 		"Request":     string(body),
-		"Result":      string(capturingWriter.Body),
+		"Result":      result,
 		"URL":         url,
 		"Email":       email,
 		"Groups":      groups,
@@ -333,7 +358,6 @@ func (c *DashMiddleware) ServeHTTP(responseWriter http.ResponseWriter, req *http
 	trackReq.Header.Set("Content-Type", contentType)
 
 	// Check if the data is compressed
-	contentEncoding := capturingWriter.ResponseWriter.Header().Get("Content-Encoding")
 	if contentEncoding == "gzip" {
 		trackReq.Header.Set("Content-Encoding", "gzip")
 	}
